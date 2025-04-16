@@ -47,5 +47,6 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 COPY . .
 
 RUN uv run manage.py collectstatic --noinput
+RUN uv run manage.py compilemessages
 
 EXPOSE 8000
