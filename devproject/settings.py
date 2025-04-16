@@ -34,13 +34,20 @@ _ = lambda s: s
 SECRET_KEY = "1znyfpwp*_#!r0#l248lht*6)_0b+504n*2-8cxf(2u)fhi0f^"
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.getenv("DEBUG", "0") == "1"
 
 
 # A list of strings representing the host/domain names that this Django site can serve.
 # If you are unsure, just enter here your domain name, eg. ['mysite.com', 'www.mysite.com']
 
-ALLOWED_HOSTS = ["*"]
+ALLOWED_HOSTS = ["*", "forumbyd.com", "www.forumbyd.com"]
+
+
+# Trusted origins for CSRF protection
+# https://docs.djangoproject.com/en/stable/ref/settings/#csrf-trusted-origins
+CSRF_TRUSTED_ORIGINS = [
+    "https://forumbyd.com",
+]
 
 
 # Database
@@ -132,6 +139,11 @@ MEDIA_ROOT = os.path.join(BASE_DIR, "media")
 STATICFILES_DIRS = []
 
 
+# Static files storage
+# https://whitenoise.readthedocs.io/en/stable/django.html#add-compression-and-caching-support
+STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
+
+
 # Email configuration
 # https://docs.djangoproject.com/en/1.11/ref/settings/#email-backend
 
@@ -177,10 +189,15 @@ LOGIN_URL = "misago:login"
 LOGOUT_URL = "misago:logout"
 
 MIDDLEWARE = [
-    "debug_toolbar.middleware.DebugToolbarMiddleware",
+    "honeybadger.contrib.DjangoHoneybadgerMiddleware",
+    # Add debug toolbar middleware only when DEBUG is True
+    # Note: Insert *before* RealIPMiddleware if it needs the real IP
+    # "debug_toolbar.middleware.DebugToolbarMiddleware", # Placeholder, will be added below if DEBUG
     "misago.users.middleware.RealIPMiddleware",
     "misago.core.middleware.FrontendContextMiddleware",
     "django.middleware.security.SecurityMiddleware",
+    # WhiteNoise Middleware
+    "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -197,6 +214,7 @@ MIDDLEWARE = [
     "misago.admin.middleware.AdminAuthMiddleware",
     "misago.threads.middleware.UnreadThreadsCountMiddleware",
 ]
+
 
 ROOT_URLCONF = "devproject.urls"
 
@@ -250,19 +268,19 @@ WSGI_APPLICATION = "devproject.wsgi.application"
 # Django Debug Toolbar
 # http://django-debug-toolbar.readthedocs.io/en/stable/configuration.html
 
-DEBUG_TOOLBAR_PANELS = [
-    "debug_toolbar.panels.versions.VersionsPanel",
-    "debug_toolbar.panels.timer.TimerPanel",
-    "debug_toolbar.panels.settings.SettingsPanel",
-    "debug_toolbar.panels.headers.HeadersPanel",
-    "debug_toolbar.panels.request.RequestPanel",
-    "debug_toolbar.panels.sql.SQLPanel",
-    "misago.acl.panels.MisagoACLPanel",
-    "debug_toolbar.panels.staticfiles.StaticFilesPanel",
-    "debug_toolbar.panels.templates.TemplatesPanel",
-    "debug_toolbar.panels.cache.CachePanel",
-    "debug_toolbar.panels.signals.SignalsPanel",
-]
+# DEBUG_TOOLBAR_PANELS = [
+#     "debug_toolbar.panels.versions.VersionsPanel",
+#     "debug_toolbar.panels.timer.TimerPanel",
+#     "debug_toolbar.panels.settings.SettingsPanel",
+#     "debug_toolbar.panels.headers.HeadersPanel",
+#     "debug_toolbar.panels.request.RequestPanel",
+#     "debug_toolbar.panels.sql.SQLPanel",
+#     "misago.acl.panels.MisagoACLPanel",
+#     "debug_toolbar.panels.staticfiles.StaticFilesPanel",
+#     "debug_toolbar.panels.templates.TemplatesPanel",
+#     "debug_toolbar.panels.cache.CachePanel",
+#     "debug_toolbar.panels.signals.SignalsPanel",
+# ]
 
 
 # Django Rest Framework
@@ -357,6 +375,63 @@ EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # Display debug toolbar if IN_MISAGO_DOCKER enviroment var is set to "1"
 
-DEBUG_TOOLBAR_CONFIG = {
-    "SHOW_TOOLBAR_CALLBACK": "misago.conf.debugtoolbar.enable_debug_toolbar"
+# DEBUG_TOOLBAR_CONFIG = {
+#     "SHOW_TOOLBAR_CALLBACK": "misago.conf.debugtoolbar.enable_debug_toolbar"
+# }
+
+
+HONEYBADGER = {"API_KEY": "hbp_SGZoskKcsyPhjhMJCUryiKhuAQdwol21pJnL"}
+
+
+# Logging Configuration (Explicitly defined to ensure output when DEBUG=False)
+# Define LOGLEVEL based on environment variable, default to INFO
+LOGLEVEL = os.environ.get("LOGLEVEL", "INFO").upper()
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,  # Keep existing loggers (like Honeybadger's)
+    "formatters": {
+        "verbose": {
+            "format": "{levelname} {asctime} {module} {process:d} {thread:d} {message}",
+            "style": "{",
+        },
+        "simple": {
+            "format": "{levelname} {message}",
+            "style": "{",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",  # Logs to stderr/stdout
+            "formatter": "verbose",  # Use a detailed formatter
+            "level": LOGLEVEL,  # Ensure handler processes messages at specified level
+        },
+        # Optional: Add Honeybadger handler if needed and not auto-configured
+        # 'honeybadger': {
+        #     'level': 'ERROR', # Send errors and higher to Honeybadger
+        #     'class': 'honeybadger.contrib.django.handlers.LoggingHandler',
+        # },
+    },
+    "loggers": {
+        "django": {
+            "handlers": ["console"],  # Send Django's logs to console
+            "level": LOGLEVEL,  # Log level INFO or higher
+            "propagate": True,  # Allow logs to propagate to the root logger
+        },
+        "django.request": {
+            "handlers": ["console"],  # Specifically log request handling errors
+            "level": "ERROR",  # Only log ERROR+ for request issues
+            "propagate": True,  # Ensure errors propagate to root logger for visibility
+        },
+        "misago": {
+            "handlers": ["console"],
+            "level": LOGLEVEL,
+            "propagate": True,
+        },
+        # Root logger - catches everything else
+        "": {
+            "handlers": ["console"],  # Ensure root logger uses console
+            "level": LOGLEVEL,  # Catch INFO and above from all sources
+        },
+    },
 }

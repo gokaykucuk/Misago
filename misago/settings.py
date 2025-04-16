@@ -1,11 +1,16 @@
 """Misago's default Django Project settings."""
 
+import os
+import structlog
+
 __all__ = [
     "INSTALLED_APPS",
     "INSTALLED_PLUGINS",
     "MISAGO_NOTIFICATIONS_RETRY_DELAY",
     "TEMPLATE_CONTEXT_PROCESSORS",
 ]
+
+import os
 
 INSTALLED_APPS = [
     # Misago overrides for Django core feature
@@ -23,7 +28,7 @@ INSTALLED_APPS = [
     # 3rd party apps used by Misago
     "ariadne_django",
     "celery",
-    "debug_toolbar",
+    # "debug_toolbar",
     "mptt",
     "rest_framework",
     "social_django",
@@ -90,3 +95,67 @@ TEMPLATE_CONTEXT_PROCESSORS = [
 ]
 
 MISAGO_NOTIFICATIONS_RETRY_DELAY = 5  # Seconds
+
+HONEYBADGER = {
+  'API_KEY': 'hbp_SGZoskKcsyPhjhMJCUryiKhuAQdwol21pJnL'
+}
+
+
+# Define LOGLEVEL based on environment variable, default to INFO
+LOGLEVEL = os.environ.get('LOGLEVEL', 'INFO').upper()
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False, # Keep existing loggers (like Honeybadger's)
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler', # Logs to stderr/stdout
+            'formatter': 'verbose', # Use a detailed formatter
+        },
+        # Optional: Add Honeybadger handler if not automatically configured elsewhere
+        # 'honeybadger': {
+        #     'level': 'ERROR', # Send errors and higher to Honeybadger
+        #     'class': 'honeybadger.contrib.django.handlers.LoggingHandler',
+        # },
+        # Optional: File handler (make sure the container user can write to the log path)
+        # 'file': {
+        #     'level': 'INFO',
+        #     'class': 'logging.FileHandler',
+        #     'filename': '/path/inside/container/django.log', # Choose a writable path
+        #     'formatter': 'verbose',
+        # },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console'], # Send Django's logs to console
+            'level': LOGLEVEL,       # Log level INFO or higher
+            'propagate': True,       # Allow logs to propagate to the root logger
+        },
+        'django.request': {
+            'handlers': ['console'], # Specifically log request handling errors
+            'level': 'ERROR',        # Only log ERROR+ for request issues (less verbose)
+            'propagate': False,      # Don't send request errors to root logger if handled here
+        },
+        # Add your app's logger if you use logging within your apps
+        'misago': {
+            'handlers': ['console'],
+            'level': LOGLEVEL,
+            'propagate': True,
+        },
+        # Root logger - catches everything else
+        '': {
+             'handlers': ['console'], # Add 'honeybadger' here too if using the handler
+             'level': LOGLEVEL,
+        }
+    },
+}

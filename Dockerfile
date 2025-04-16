@@ -1,11 +1,20 @@
 # This Dockerfile is intended solely for local development of Misago
 # If you are seeking a suitable Docker setup for running Misago in a 
 # production, please use misago-docker instead
-FROM python:3.12
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm
 
-ENV PYTHONUNBUFFERED 1
-ENV IN_MISAGO_DOCKER 1
-ENV MISAGO_PLUGINS "/app/plugins"
+ENV IN_MISAGO_DOCKER=1
+ENV MISAGO_PLUGINS="/app/plugins"
+
+# Enable uv's bytecode compilation for better performance
+ENV UV_COMPILE_BYTECODE=1
+# Copy dependencies from the uv-managed venv into the container
+# rather than symlinking (helps if using ephemeral volumes)
+ENV UV_LINK_MODE=copy
+
+# Disable buffering for Python
+ENV PYTHONUNBUFFERED=1
+
 
 # Install env dependencies in one single command/layer
 RUN apt-get update && apt-get install -y \
@@ -21,20 +30,22 @@ RUN apt-get update && apt-get install -y \
     gettext
 
 # Add files and dirs for build step
-ADD dev /app/dev
-ADD requirements.txt /app/requirements.txt
+# ADD dev /app/dev
+
 ADD plugins /app/plugins
 
 WORKDIR /app/
 
-# Install Misago requirements
-RUN pip install --upgrade pip && \
-    pip install -r /app/requirements.txt && \
-    pip install pip-tools
+# --- 2) Prepare the Python environment with uv ---
+# Copy in just uv.lock and pyproject.toml for caching the dependency layer
+COPY uv.lock pyproject.toml /app/
 
-# Bootstrap plugins
-RUN ./dev bootstrap_plugins
+# Let uv build your venv and install dependencies (frozen, no dev deps)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
+
+COPY . .
+
+RUN uv run manage.py collectstatic --noinput
 
 EXPOSE 8000
-
-CMD python manage.py runserver 0.0.0.0:8000 --noreload
