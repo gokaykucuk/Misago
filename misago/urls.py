@@ -1,3 +1,4 @@
+from django.conf.urls.static import static
 from django.urls import include, path
 from django.views.generic import TemplateView
 
@@ -33,7 +34,6 @@ urlpatterns = [
     path("", forum_index, name="index"),
 ]
 
-
 # Register API
 apipatterns = hooks.apipatterns + [
     path("", include("misago.legal.urls.api")),
@@ -48,7 +48,6 @@ urlpatterns += [
     path("api/v2/", include("misago.apiv2.urls")),
 ]
 
-
 # Register Misago ACP
 if settings.MISAGO_ADMIN_PATH:
     # Admin patterns recognised by Misago
@@ -58,3 +57,7 @@ if settings.MISAGO_ADMIN_PATH:
     urlpatterns += [
         path(admin_prefix, include((adminpatterns, "admin"), namespace="admin"))
     ]
+
+# Use static file server for static and media files (debug only)
+urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
+urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
