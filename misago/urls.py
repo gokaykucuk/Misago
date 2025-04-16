@@ -1,4 +1,3 @@
-from django.conf.urls.static import static
 from django.urls import include, path
 from django.views.generic import TemplateView
 
@@ -57,7 +56,3 @@ if settings.MISAGO_ADMIN_PATH:
     urlpatterns += [
         path(admin_prefix, include((adminpatterns, "admin"), namespace="admin"))
     ]
-
-# Use static file server for static and media files (debug only)
-urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
-urlpatterns += static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
